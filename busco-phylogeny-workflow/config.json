@@ -1,0 +1,4 @@
+{
+	"data":"busco-phylogeny-workflow/test-data",
+	"script_path":"busco-phylogeny-workflow/data/clean-seqs.sh"
+}
