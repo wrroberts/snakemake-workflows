@@ -1,0 +1,92 @@
+configfile:
+	"config.json"
+
+GENES, = glob_wildcards(config['data'] + "/prot-seqs/{gene}.faa")
+
+rule all:
+	input:
+		"phylogeny/busco-concat.treefile"
+
+rule change_fasta_headers:
+	input:
+		script=config['script_path']
+	params:
+		workdir=config['data']
+	shell:
+		"cd {params.workdir} && bash {input.script}"
+
+rule align_sequences:
+	input:
+		"data/prot-seqs/{gene}.faa"
+	output:
+		"alignments/{gene}.muscle.faa"
+	log: "logs/muscle/{gene}.muscle.txt"
+	shell:
+		"muscle -align {input} -output {output}"
+
+rule trim_alignments:
+	input:
+		"alignments/{gene}.muscle.faa"
+	output:
+		"alignments/{gene}.muscle.clipkit.faa"
+	log: "logs/clipkit/{gene}.clipkit.txt"
+	shell:
+		"clipkit {input} -m smart-gap -o {output}"
+
+rule concatenate_alignments:
+	input:
+		alns=expand("alignments/{gene}.muscle.clipkit.faa", gene=GENES)
+	output:
+		fasta="phylogeny/busco-concat.fasta",
+		partition="phylogeny/busco-concat.partition"
+	threads: 2
+	log: "logs/amas.txt"
+	shell:
+		"AMAS.py concat -i {input.alns} "
+		"-f fasta -d aa -p {output.partition} -t {output.fasta} "
+		"-u fasta -y raxml -c 2"
+
+rule iqtree:
+	input:
+		fasta="phylogeny/busco-concat.fasta",
+		partition="phylogeny/busco-concat.partition"
+	output:
+		"busco-concat.treefile"
+	threads: 8
+	log: "logs/iqtree.txt"
+	params:
+		outdir="phylogeny",
+		prefix="busco-concat"
+	shell:
+		"""
+		iqtree2 -s {input.fasta} -p {input.partition} -m MFP -msub nuclear -T {threads} --prefix {params.prefix} -alrt 10000
+		"""
+
+rule move_iqtree_output:
+	input:
+		"busco-concat.treefile"
+	output:
+		treefile="phylogeny/busco-concat.treefile",
+		log="phylogeny/busco-concat.log",
+		iqtree="phylogeny/busco-concat.iqtree",
+		best_model="phylogeny/busco-concat.best_model.nex",
+		best_scheme="phylogeny/busco-concat.best_scheme",
+		best_scheme_nex="phylogeny/busco-concat.best_scheme.nex",
+		bionj="phylogeny/busco-concat.bionj",
+		ckp="phylogeny/busco-concat.ckp.gz",
+		mldist="phylogeny/busco-concat.mldist",
+		model="phylogeny/busco-concat.model.gz"
+	shell:
+		"""
+		mkdir -p phylogeny
+		mv busco-concat.treefile {output.treefile}
+		mv busco-concat.log {output.log}
+		mv busco-concat.iqtree {output.iqtree}
+		mv busco-concat.best_model.nex {output.best_model}
+		mv busco-concat.best_scheme {output.best_scheme}
+		mv busco-concat.best_scheme.nex {output.best_scheme_nex}
+		mv busco-concat.bionj {output.bionj}
+		mv busco-concat.ckp.gz {output.ckp}
+		mv busco-concat.mldist {output.mldist}
+		mv busco-concat.model.gz {output.model}
+		"""
