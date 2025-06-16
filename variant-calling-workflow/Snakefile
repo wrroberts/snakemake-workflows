@@ -1,0 +1,118 @@
+configfile:
+	"config.json"
+
+SAMPLES, = glob_wildcards(config['data']+"/{id}.read1.fq.gz")
+
+rule all:
+	input:
+		"variants/freebayes.filt.stats"
+
+rule bwa_map:
+	input:
+		ref=config['genome'],
+		r1="data/{sample}.read1.fq.gz",
+		r2="data/{sample}.read2.fq.gz"
+	output:
+		"mapped_reads/{sample}.bam"
+	log:
+		"logs/bwa/{sample}.log"
+	threads: 4
+	shell:
+		"bwa index {input.ref} ; "
+		"bwa mem -t {threads} {input.ref} {input.r1} {input.r2} | "
+		"samtools view -Sb - > {output} "
+		"2> {log}"
+
+rule samtools_sort:
+	input:
+		"mapped_reads/{sample}.bam"
+	output:
+		"sorted_reads/{sample}.bam"
+	threads: 4
+	shell:
+		"samtools sort -@ {threads} -O bam {input} > {output}"
+
+rule samtools_index:
+	input:
+		"sorted_reads/{sample}.bam"
+	output:
+		"sorted_reads/{sample}.bam.bai"
+	threads: 4
+	shell:
+		"samtools index -@ {threads} {input}"
+
+rule add_read_groups:
+	input:
+		"sorted_reads/{sample}.bam"
+	output:
+		"sorted_reads/{sample}.rg_added.bam"
+	log:
+		"logs/picard/{sample}.AddOrReplaceReadGroups.log"
+	shell:
+		"picard AddOrReplaceReadGroups -I {input} -O {output} "
+		"-VALIDATION_STRINGENCY SILENT -SO coordinate "
+		"-RGID {wildcards.sample} -RGLB {wildcards.sample} -RGPL ILLUMINA "
+		"-RGPU machine -RGSM {wildcards.sample}"
+
+rule mark_duplicates:
+	input:
+		"sorted_reads/{sample}.rg_added.bam"
+	output:
+		bam="sorted_reads/{sample}.dedupped.bam",
+		metrics="sorted_reads/{sample}.metrics.output"
+	log:
+		"logs/picard/{sample}.MarkDuplicates.log"
+	shell:
+		"picard MarkDuplicates -I {input} -O {output.bam} "
+		"-METRICS_FILE {output.metrics} -CREATE_INDEX true "
+		"-VALIDATION_STRINGENCY SILENT"
+
+rule freebayes:
+	input:
+		ref="data/genome.fasta",
+		bams=expand("sorted_reads/{sample}.dedupped.bam", sample=SAMPLES)
+	output:
+		"variants/freebayes.vcf"
+	log:
+		"logs/freebayes/freebayes.log"
+	shell:
+		"freebayes -f {input.ref} {input.bams} > {output}"
+
+rule bgzip_vcf:
+	input:
+		"variants/freebayes.vcf"
+	output:
+		"variants/freebayes.vcf.gz"
+	shell:
+		"bgziptabix {input}"
+
+rule vcffilter:
+	input:
+		"variants/freebayes.vcf.gz"
+	output:
+		"variants/freebayes.filt.vcf"
+	params:
+		filter="'QUAL / DP > 0.5 & QUAL > 20 & MQM > 20'",
+		biallelic="'GT = 0|1'"
+	shell:
+		"vcffilter -f {params.filter} -g {params.biallelic} {input} | "
+		"vcfallelicprimitives > {output}"
+
+rule bgzip_filt:
+	input:
+		"variants/freebayes.filt.vcf"
+	output:
+		"variants/freebayes.filt.vcf.gz"
+	shell:
+		"bgziptabix {input}"
+
+rule vcfstats:
+	input:
+		all="variants/freebayes.vcf.gz",
+		filt="variants/freebayes.filt.vcf.gz"
+	output:
+		all="variants/freebayes.stats",
+		filt="variants/freebayes.filt.stats"
+	shell:
+		"vcfstats {input.all} > {output.all} ; "
+		"vcfstats {input.filt} > {output.filt}"
