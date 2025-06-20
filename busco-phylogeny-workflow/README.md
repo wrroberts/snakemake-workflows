@@ -4,6 +4,12 @@
 ### Overview
 This workflow performs ortholog alignment, alignment trimming, alignment concatenation, and phylogenomic estimation using the BUSCO Stramenopile orthologs. It is designed to ensure reproducibility through version-controlled code, conda environments, and modular rule-based execution.
 
+The following steps are undertaken by the workflow:
+- Align ortholog sequences using MUSCLE
+- Trim ortholog alignments using ClipKIT
+- Concatenate trimmed alignments together using AMAS
+- Estimate a phylogeny from the concatenated alignment using IQ-Tree
+
 ### Requirements
 - [Snakemake](https://snakemake.readthedocs.io/en/stable/) >= 7.0
 - [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Mamba](https://mamba.readthedocs.io/en/latest/) recommended for faster environment solving
