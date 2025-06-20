@@ -54,5 +54,5 @@ snakemake --use-conda --cores 4
 ```
 To generate a DAG of the workflow:
 ```
-snakemake --dag | dot -Tpdf > workflow_dag.pdf
+snakemake --forceall --rulegraph | dot -Tpdf > workflow_dag.pdf
 ```
