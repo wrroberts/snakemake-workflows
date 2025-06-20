@@ -4,6 +4,13 @@
 ### Overview
 This workflow performs short read mapping to a reference genome, read group labeling, removal of PCR duplicates, variant calling, and calculated some basic summary statistics. It is designed to ensure reproducibility through version-controlled code, conda environments, and modular rule-based execution.
 
+The following steps are undertaken by the workflow:
+- Align the read files against a genomic reference using BWA MEM
+- Sort and index the alignments using Samtools
+- Add read group info and mark duplicate reads using Picard
+- Call variants using FreeBayes
+- Perform light filtering and calculate variant statistics using Vcflib
+
 ### Requirements
 - [Snakemake](https://snakemake.readthedocs.io/en/stable/) >= 7.0
 - [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Mamba](https://mamba.readthedocs.io/en/latest/) recommended for faster environment solving
