@@ -31,6 +31,7 @@ conda activate transcriptome-assembly
 Download the required databases
 - SwissProt: https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz
 - Pfam: https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz
+- Reference proteome (provided here): `diatom.proteins.faa`
 
 Prepare the databases
 ```
