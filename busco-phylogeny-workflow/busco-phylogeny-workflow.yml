@@ -149,4 +149,3 @@ dependencies:
   - yte=1.8.1=pyha770c72_0
   - zipp=3.23.0=pyhd8ed1ab_0
   - zstandard=0.23.0=py312h66e93f0_2
-prefix: /home/wader/.conda/envs/busco-phylogeny-workflow
