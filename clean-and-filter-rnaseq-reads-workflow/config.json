@@ -1,0 +1,5 @@
+{
+	"data":"/home/wader/scripts/snakemake-workflows/clean-and-filter-rnaseq-reads/test-data",
+	"databases":"/home/wader/databases",
+	"adapters":"/home/wader/.conda/envs/transcriptome-assembly/share/trimmomatic/adapters"
+}

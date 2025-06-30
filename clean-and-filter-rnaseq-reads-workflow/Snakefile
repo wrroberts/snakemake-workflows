@@ -1,0 +1,143 @@
+import glob
+import os
+
+configfile:
+	"config.json"
+
+SAMPLES, = glob_wildcards(config['data'] + "/{sample}.read1.fastq.gz")
+
+rule all:
+	input:
+		expand("filtered/{sample}.read1.cor_trim_noVec_noOrg_no_rRNA.fq.gz", sample=SAMPLES),
+		expand("filtered/{sample}.read2.cor_trim_noVec_noOrg_no_rRNA.fq.gz", sample=SAMPLES),
+		expand("logs/bowtie2/{sample}.rrna.log", sample=SAMPLES)
+
+rule rcorrector:
+	input:
+		left=lambda wildcards: f"{config['data']}/{wildcards.sample}.read1.fastq.gz",
+		right=lambda wildcards: f"{config['data']}/{wildcards.sample}.read2.fastq.gz"
+	output:
+		r1_out="corrected/{sample}.read1.cor.fq.gz",
+		r2_out="corrected/{sample}.read2.cor.fq.gz"
+	threads: 8
+	log:
+		"logs/rcorrector/{sample}.rcorrector.log"
+	shell:
+		"""
+		mkdir -p corrected logs/rcorrector
+		
+		run_rcorrector.pl \
+			-1 {input.left} \
+			-2 {input.right} \
+			-k 31 -t {threads} > {log} 2>&1 
+
+		mv {wildcards.sample}.read1.cor.fq.gz {output.r1_out}
+		mv {wildcards.sample}.read2.cor.fq.gz {output.r2_out}
+		"""
+
+adapters = config['adapters'] + "/TruSeq3-PE-2.fa"
+
+rule trimmomatic:
+	input:
+		r1="corrected/{sample}.read1.cor.fq.gz",
+		r2="corrected/{sample}.read2.cor.fq.gz"
+	output:
+		r1_trim="trimmed/{sample}.read1.cor_trim.fq.gz",
+		r1_unpaired="trimmed/{sample}.read1.cor_unpaired.fq.gz",
+		r2_trim="trimmed/{sample}.read2.cor_trim.fq.gz",
+		r2_unpaired="trimmed/{sample}.read2.cor_unpaired.fq.gz"
+	threads: 8
+	log: "logs/trimmomatic/{sample}.log"
+	shell:
+		"""
+		mkdir -p trimmed logs/trimmomatic
+
+		trimmomatic PE -threads {threads} -phred33 \
+			{input.r1} {input.r2} \
+			{output.r1_trim} {output.r1_unpaired} \
+			{output.r2_trim} {output.r2_unpaired} \
+			ILLUMINACLIP:{adapters}:2:40:15 LEADING:2 TRAILING:2 \
+			SLIDINGWINDOW:4:2 MINLEN:30 > {log} 2>&1
+		"""
+
+univec_database = config['databases'] + "/UniVec_Core"
+
+rule bowtie2_univec:
+	input:
+		left="trimmed/{sample}.read1.cor_trim.fq.gz",
+		right="trimmed/{sample}.read2.cor_trim.fq.gz"
+	output:
+		r1_filt="filtered/{sample}.read1.cor_trim_noVec.fq.gz",
+		r2_filt="filtered/{sample}.read2.cor_trim_noVec.fq.gz"
+	threads: 8
+	log:
+		reads="logs/bowtie2/{sample}.univec.reads.log",
+		result="logs/bowtie2/{sample}.univec.log"
+	shell:
+		"""
+		mkdir -p filtered logs/bowtie2
+
+		bowtie2 -x {univec_database} \
+		-1 {input.left} -2 {input.right} \
+		--end-to-end --very-sensitive \
+		--un-conc-gz filtered/{wildcards.sample}.read%.cor_trim_noVec.fq.gz \
+		1> {log.reads} 2> {log.result}
+
+		rm {log.reads}
+		"""
+
+organelle_database = config['databases'] + "/diatom_pt_mt"
+
+rule bowtie2_organelle:
+	input:
+		left="filtered/{sample}.read1.cor_trim_noVec.fq.gz",
+		right="filtered/{sample}.read2.cor_trim_noVec.fq.gz"
+	output:
+		r1_filt="filtered/{sample}.read1.cor_trim_noVec_noOrg.fq.gz",
+		r2_filt="filtered/{sample}.read2.cor_trim_noVec_noOrg.fq.gz",
+		r1_org="filtered/{sample}.read1.cor_trim_noVec_Org.fq.gz",
+		r2_org="filtered/{sample}.read2.cor_trim_noVec_Org.fq.gz"
+	threads: 8
+	log:
+		reads="logs/bowtie2/{sample}.organelles2.log",
+		result="logs/bowtie2/{sample}.organelles.log"
+	shell:
+		"""
+		bowtie2 -x {organelle_database} \
+		-1 {input.left} -2 {input.right} \
+		--local --very-sensitive \
+		--un-conc-gz filtered/{wildcards.sample}.read%.cor_trim_noVec_noOrg.fq.gz \
+		--al-conc-gz filtered/{wildcards.sample}.read%.cor_trim_noVec_Org.fq.gz \
+		1> {log.reads} 2> {log.result}
+
+		rm {log.reads}
+		"""
+
+
+rrna_database = config['databases'] + "/smr_v4.3_default_db"
+
+rule bowtie2_rrna:
+	input:
+		left="filtered/{sample}.read1.cor_trim_noVec_noOrg.fq.gz",
+		right="filtered/{sample}.read2.cor_trim_noVec_noOrg.fq.gz"
+	output:
+		r1_filt="filtered/{sample}.read1.cor_trim_noVec_noOrg_no_rRNA.fq.gz",
+		r2_filt="filtered/{sample}.read2.cor_trim_noVec_noOrg_no_rRNA.fq.gz",
+		r1_rrna="filtered/{sample}.read1.cor_trim_rRNA.fq.gz",
+		r2_rrna="filtered/{sample}.read2.cor_trim_rRNA.fq.gz"
+	threads: 8
+	log:
+		reads="logs/bowtie2/{sample}.rrna2.log",
+		result="logs/bowtie2/{sample}.rrna.log"
+	shell:
+		"""
+		bowtie2 -x {rrna_database} \
+		-1 {input.left} -2 {input.right} \
+		--local --very-sensitive \
+		--un-conc-gz filtered/{wildcards.sample}.read%.cor_trim_noVec_noOrg_no_rRNA.fq.gz \
+		--al-conc-gz filtered/{wildcards.sample}.read%.cor_trim_rRNA.fq.gz \
+		1> {log.reads} 2> {log.result}
+
+		rm {log.reads}
+		"""
+
