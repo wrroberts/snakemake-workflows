@@ -27,6 +27,11 @@ conda env create -f busco-phylogeny-workflow.yml
 conda activate busco-phylogeny-workflow
 ```
 
+### Input Data
+The input data must be a directory (e.g., `test-data`) which contains any number of subdirectories (one for each species or genome) that each contain the single-copy protein orthologs identified by BUSCO. See the `test-data/` for an example.
+
+BEFORE you run the Snakemake workflow, run the python3 accessory script `clean-seqs.py`. This script goes into each subdirectory of `test-data/`, reads each ortholog fasta file and select the first entry (in case of duplications), changes the fasta header to match the name of the subdirectory, and then concatenates each BUSCO ortholog from each subdirectory into a single fasta file (e.g., all 9939at33634.faa files will be combined into a single file). All of these concatenated fasta files will then be found in `test-data/prot-seqs/`.
+
 ### Workflow Structure
 - `Snakefile`: Main workflow logic
 - `config.json`: Configuration file for data paths
@@ -49,8 +54,8 @@ snakemake --use-conda --cores <number-of-cores>
 Customize the `config.json` (or `.yml`) file before running. Example:
 ```
 {
-	"data":"/home/wader/scripts/busco-phylogeny-workflow/test-data",
-	"script_path":"/home/wader/scripts/busco-phylogeny-workflow/data/clean-seqs.sh"
+	"data":"/home/wader/scripts/snakemake-workflows/busco-phylogeny-workflow/test-data",
+	"script_path":"/home/wader/scripts/snakemake-workflows/busco-phylogeny-workflow/data/clean-seqs.sh"
 }
 ```
 
