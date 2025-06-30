@@ -1,7 +1,9 @@
 configfile:
 	"config.json"
 
-GENES = glob_wildcards(config['data'] + "/prot-seqs/{gene}.faa")[0]
+GENES = glob_wildcards(config['data'] + "/prot-seqs/{gene}.faa")
+if not GENES:
+	raise ValueError(f"No matching files for pattern: {config['data']}/prot-seqs/{{gene}}.faa")
 
 rule all:
 	input:
