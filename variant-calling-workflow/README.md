@@ -18,8 +18,8 @@ The following steps are undertaken by the workflow:
 ### Installation
 Clone the repository:
 ```
-git clone https://github.com/wrroberts/snakemake-workflows/variant-calling-workflow.git
-cd variant-calling-workflow
+git clone https://github.com/wrroberts/snakemake-workflows.git
+cd snakemake-workflows/variant-calling-workflow
 ```
 Install the conda environment
 ```
