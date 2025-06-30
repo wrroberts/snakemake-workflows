@@ -23,7 +23,7 @@ cd snakemake-workflows/variant-calling-workflow
 ```
 Install the conda environment
 ```
-create env create -f variant-workflow.yml
+conda env create -f variant-workflow.yml
 
 conda activate variant-workflow
 ```
