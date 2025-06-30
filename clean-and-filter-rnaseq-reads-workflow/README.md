@@ -21,7 +21,7 @@ cd snakemake-workflows/clean-and-filter-rnaseq-reads-workflow/
 ```
 Install the conda environment:
 ```
-create env create -f clean-and-filter-rnaseq.yml
+conda env create -f clean-and-filter-rnaseq.yml
 
 conda activate clean-and-filter-rnaseq
 ```
