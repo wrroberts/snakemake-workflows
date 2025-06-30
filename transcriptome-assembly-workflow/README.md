@@ -19,8 +19,8 @@ The following steps are undertaken by the workflow:
 ### Installation
 Clone the repository:
 ```
-git clone https://github.com/wrroberts/snakemake-workflows/transcriptome-assembly-workflow.git
-cd transcriptome-assembly-workflow/
+git clone https://github.com/wrroberts/snakemake-workflows
+cd snakemake-workflows/transcriptome-assembly-workflow/
 ```
 Install the conda environment
 ```
