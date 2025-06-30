@@ -12,4 +12,4 @@ dependencies:
   - samtools=1.22
   - snakemake=9.5.1
   - tabix=1.11
-  - vcflib
+  - vcflib=1.0.14
