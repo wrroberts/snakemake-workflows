@@ -1,4 +1,4 @@
 {
-	"data":"variant-workflow/test-data",
-	"genome":"variant-workflow/data/genome.fasta"
+	"data":"test-data",
+	"genome":"test-data/genome.fasta"
 }
