@@ -1,0 +1,5 @@
+{
+	"data":"/home/wader/scripts/snakemake-workflows/transcriptome-assembly/test-data",
+	"databases":"/home/wader/scripts/snakemake-workflows/transcriptome-assembly",
+	"scripts":"/home/wader/scripts/snakemake-workflows/transcriptome-assembly/scripts"
+}

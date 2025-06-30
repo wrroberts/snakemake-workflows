@@ -1,0 +1,307 @@
+import glob
+import os
+
+configfile:
+	"config.json"
+
+SAMPLES, = glob_wildcards(config['data'] + "/{sample}.read1.fastq.gz")
+
+read1_files = sorted(glob.glob(config['data'] + "/*.read1.fastq.gz"))
+read2_files = sorted(glob.glob(config['data'] + "/*.read2.fastq.gz"))
+
+rule all:
+	input:
+		pep="final-assembly/trinity.largest_cluster_transcripts.fa.transdecoder.pep.cdhit",
+		cds="final-assembly/trinity.largest_cluster_transcripts.fa.transdecoder.cds.cdhit"
+
+rule trinity:
+	input:
+		left=read1_files,
+		right=read2_files
+	output:
+		"trinity.Trinity.fasta"
+	threads: 8
+	log:
+		"logs/trinity/trinity.log"
+	params:
+		left=lambda wildcards, input: ",".join(input.left),
+		right=lambda wildcards, input: ",".join(input.right)
+	shell:
+		"""
+		mkdir -p logs/trinity
+
+		Trinity \
+		--seqType fq \
+		--left {params.left} \
+		--right {params.right} \
+		--SS_lib_type FR \
+		--full_cleanup \
+		--max_memory 150G \
+		--CPU {threads} \
+		--output trinity > {log} 2>&1
+		
+		"""
+
+rule transrate:
+	input:
+		assembly="trinity.Trinity.fasta",
+		left=read1_files,
+		right=read2_files
+	output:
+		"transrate/trinity.Trinity/contigs.csv"
+	threads: 8
+	log:
+		"logs/transrate/transrate.log"
+	params:
+		left=lambda wildcards, input: ",".join(input.left),
+		right=lambda wildcards, input: ",".join(input.right)
+	shell:
+		"""
+		mkdir -p transrate logs/transrate
+
+		transrate \
+		--assembly {input.assembly} \
+		--left {params.left} \
+		--right {params.right} \
+		--threads {threads} \
+		--output transrate > {log} 2>&1
+		"""
+
+transrate_filter_script = config['scripts'] + "/filter_transcripts_transrate.py"
+
+rule transrate_filter:
+	input:
+		csv="transrate/trinity.Trinity/contigs.csv",
+		assembly="trinity.Trinity.fasta"
+	output:
+		"transrate/trinity.good_transcripts.short_name.fa"
+	log:
+		"logs/transrate/transrate-filter.log"
+	shell:
+		"""
+		python {transrate_filter_script} \
+		{input.assembly} \
+		{input.csv} \
+		transrate/ > {log} 2>&1
+		"""
+
+chimera_filter_script = config['scripts'] + "/run_chimera_detection.py"
+
+rule chimera_filtering:
+	input:
+		transcripts="transrate/trinity.good_transcripts.short_name.fa",
+		reference="diatom.proteins.faa"
+	output:
+		"chimera_removal/trinity.good_transcripts.short_name.filtered_transcripts.fa"
+	threads: 8
+	log:
+		"logs/chimera_removal/chimera_removal.log"
+	shell:
+		"""
+		mkdir -p chimera_removal logs/chimera_removal
+
+		python {chimera_filter_script} \
+		{input.transcripts} \
+		{input.reference} \
+		{threads} \
+		chimera_removal/ > {log} 2>&1
+		"""
+
+rule salmon_index:
+	input:
+		transcripts="chimera_removal/trinity.good_transcripts.short_name.filtered_transcripts.fa"
+	output:
+		index=directory("salmon/trinity_salmon_index")
+	threads: 8
+	log:
+		"logs/salmon/salmon_index.log"
+	shell:
+		"""
+		mkdir -p salmon logs/salmon
+
+		salmon index \
+		-t {input.transcripts} \
+		-i {output.index} \
+		--type puff \
+		-p {threads} > {log} 2>&1
+		"""
+
+rule salmon_quantify:
+	input:
+		index="salmon/trinity_salmon_index",
+		left=read1_files,
+		right=read2_files
+	output:
+		quant=directory("salmon/trinity_salmon_quant"),
+		eq_classes="salmon/trinity_salmon_quant/aux_info/eq_classes.txt.gz"
+	threads: 8
+	log:
+		"logs/salmon/salmon_quant.log"
+	params:
+		left=lambda wildcards, input: " ".join(input.left),
+		right=lambda wildcards, input: " ".join(input.right)
+	shell:
+		"""
+		salmon quant \
+		-i {input.index} \
+		--dumpEq \
+		--libType A \
+		-p {threads} \
+		-o {output.quant} \
+		-1 {params.left} \
+		-2 {params.right} > {log} 2>&1
+		"""
+
+rule corset:
+	input:
+		classes="salmon/trinity_salmon_quant/aux_info/eq_classes.txt.gz"
+	output:
+		"corset/clusters.txt"
+	threads: 8
+	log:
+		"logs/corset/corset.log"
+	shell:
+		"""
+		mkdir -p corset logs/corset
+
+		corset \
+		-m 5 \
+		-i salmon_eq_classes <(zcat {input.classes}) > {log} 2>&1
+
+		mv clusters.txt corset/
+		mv counts.txt corset/
+		"""
+
+corset_filter_script = config['scripts'] + "/filter_corset_output.py"
+
+rule corset_filter:
+	input:
+		clusters="corset/clusters.txt",
+		transcripts="chimera_removal/trinity.good_transcripts.short_name.filtered_transcripts.fa"
+	output:
+		"corset/trinity.largest_cluster_transcripts.fa"
+	log:
+		"logs/corset/corset-filter.log"
+	shell:
+		"""
+		python {corset_filter_script} \
+		{input.transcripts} \
+		{input.clusters} \
+		corset/ > {log} 2>&1
+		"""
+
+rule transdecoder_longorfs:
+	input:
+		transcripts="corset/trinity.largest_cluster_transcripts.fa"
+	output:
+		dir=directory("transdecoder"),
+		long_orfs="transdecoder/trinity.largest_cluster_transcripts.fa.transdecoder_dir/longest_orfs.pep"
+	threads: 8
+	log:
+		"logs/transdecoder/longorfs.log"
+	shell:
+		"""
+		mkdir -p transdecoder logs/transdecoder
+
+		TransDecoder.LongOrfs \
+		-t {input.transcripts} \
+		-O {output.dir} > {log} 2>&1
+		"""
+
+swissprot_path = config['databases'] + "/uniprot_sprot.fasta.dmnd"
+
+rule diamond_blastp:
+	input:
+		query="transdecoder/trinity.largest_cluster_transcripts.fa.transdecoder_dir/longest_orfs.pep"
+	output:
+		"transdecoder/trinity.largest_cluster_transcripts.fa.transdecoder_dir/sprot.blastp.outfmt6"
+	threads: 8
+	log:
+		"logs/diamond/blastp.log"
+	shell:
+		"""
+		mkdir -p logs/diamond
+
+		diamond blastp \
+		-d {swissprot_path} \
+		-q {input.query} \
+		--threads {input} \
+		--out {output} \
+		--outfmt 6 \
+		--evalue 1e-5 \
+		--max-target-seqs 1 > {log} 2>&1
+		"""
+
+pfam_path = config['databases'] + "/Pfam-A.hmm"
+
+rule pfam_hmmer:
+	input:
+		query="transdecoder/trinity.largest_cluster_transcripts.fa.transdecoder_dir/longest_orfs.pep"
+	output:
+		"transdecoder/trinity.largest_cluster_transcripts.fa.transdecoder_dir/pfam.domtblout"
+	threads: 8
+	log:
+		"logs/hmmer/hmmer-pfam.log"
+	shell:
+		"""
+		mkdir -p logs/hmmer
+
+		hmmsearch \
+		--cpu {threads} -E 1e-10 \
+		--domtblout {output} \
+		{pfam_path} \
+		{input.query} > {log} 2>&1
+		"""
+
+rule transdecoder_predict:
+	input:
+		transcripts="corset/trinity.largest_cluster_transcripts.fa",
+		blastp="transdecoder/trinity.largest_cluster_transcripts.fa.transdecoder_dir/sprot.blastp.outfmt6",
+		hmmer="transdecoder/trinity.largest_cluster_transcripts.fa.transdecoder_dir/pfam.domtblout"
+	output:
+		pep="final-assembly/trinity.largest_cluster_transcripts.fa.transdecoder.pep",
+		cds="final-assembly/trinity.largest_cluster_transcripts.fa.transdecoder.cds"
+	threads: 8
+	log:
+		"logs/transdecoder/predict.log"
+	shell:
+		"""
+		mkdir -p final-assembly
+
+		TransDecoder.Predict \
+		-t {input.transcripts} \
+		-O transdecoder/ \
+		--retain_blastp_hits {input.blastp} \
+		--retain_pfam_hits {input.hmmer} \
+		--cpu {threads} \
+		--single_best_only > {log} 2>&1
+
+		mv transdecoder/trinity.largest_cluster_transcripts.fa.transdecoder.* final-assembly/
+		"""
+
+rule cdhit:
+	input:
+		pep="final-assembly/trinity.largest_cluster_transcripts.fa.transdecoder.pep",
+		cds="final-assembly/trinity.largest_cluster_transcripts.fa.transdecoder.cds"
+	output:
+		pep="final-assembly/trinity.largest_cluster_transcripts.fa.transdecoder.pep.cdhit",
+		cds="final-assembly/trinity.largest_cluster_transcripts.fa.transdecoder.cds.cdhit"
+	threads: 4
+	log:
+		pep="logs/cdhit/cdhit.log",
+		cds="logs/cdhit/cdhit-est.log"
+	shell:
+		"""
+		mkdir -p logs/cdhit
+
+		cd-hit -i {input.pep} \
+		-o {output.pep} -c 0.995 -n 5 \
+		-T {threads} > {log.pep} 2>&1
+
+		cd-hit-est -i {input.cds} \
+		-o {output.cds} -c 0.99 -n 10 \
+		-r 0 -T {threads} > {log.cds} 2>&1
+		"""
+
+
+
