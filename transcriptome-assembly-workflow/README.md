@@ -31,7 +31,7 @@ conda activate transcriptome-assembly
 Download the required databases
 - SwissProt: https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz
 - Pfam: https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz
-- Reference proteome (provided here): `diatom.proteins.faa`
+- Reference proteome (provided here, or provide your own): `diatom.proteins.faa`
 
 Prepare the databases
 ```
@@ -43,7 +43,7 @@ diamond makedb --in uniprot_sprot.fasta.gz -d uniprot_sprot.fasta.dmnd
 # For Pfam
 gunzip Pfam-A.hmm.gz
 
-# Change `config.json` to specify where these databases are located
+# Edit `config.json` to specify where these databases are located
 ```
 
 ### Workflow Structure
