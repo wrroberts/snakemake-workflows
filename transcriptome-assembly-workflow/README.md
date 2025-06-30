@@ -24,7 +24,7 @@ cd snakemake-workflows/transcriptome-assembly-workflow/
 ```
 Install the conda environment
 ```
-create env create -f transcriptome-assembly-workflow.yml
+conda env create -f transcriptome-assembly-workflow.yml
 
 conda activate transcriptome-assembly
 ```
