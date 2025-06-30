@@ -1,28 +1,25 @@
 configfile:
 	"config.json"
 
-GENES, = glob_wildcards(config['data'] + "/prot-seqs/{gene}.faa")
+GENES = glob_wildcards(config['data'] + "/prot-seqs/{gene}.faa")[0]
 
 rule all:
 	input:
-		"phylogeny/busco-concat.treefile"
-
-rule change_fasta_headers:
-	input:
-		script=config['script_path']
-	params:
-		workdir=config['data']
-	shell:
-		"cd {params.workdir} && bash {input.script}"
+		"phylogeny/busco-concat.treefile",
+		expand("alignments/{gene}.muscle.faa", gene=GENES)
 
 rule align_sequences:
 	input:
-		"data/prot-seqs/{gene}.faa"
+		config['data'] + "/prot-seqs/{gene}.faa"
 	output:
 		"alignments/{gene}.muscle.faa"
 	log: "logs/muscle/{gene}.muscle.txt"
 	shell:
-		"muscle -align {input} -output {output}"
+		"""
+		mkdir -p alignments logs/muscle
+		
+		muscle -align {input} -output {output} > {log} 2>&1
+		"""
 
 rule trim_alignments:
 	input:
@@ -31,41 +28,55 @@ rule trim_alignments:
 		"alignments/{gene}.muscle.clipkit.faa"
 	log: "logs/clipkit/{gene}.clipkit.txt"
 	shell:
-		"clipkit {input} -m smart-gap -o {output}"
+		"""
+		mkdir -p logs/clipkit
+
+		clipkit {input} -m smart-gap -o {output} > {log} 2>&1
+		"""
 
 rule concatenate_alignments:
 	input:
 		alns=expand("alignments/{gene}.muscle.clipkit.faa", gene=GENES)
 	output:
-		fasta="phylogeny/busco-concat.fasta",
-		partition="phylogeny/busco-concat.partition"
+		fasta="busco-concat.fasta",
+		partition="busco-concat.partition"
 	threads: 2
-	log: "logs/amas.txt"
+	log: "logs/amas/concat.txt"
 	shell:
-		"AMAS.py concat -i {input.alns} "
-		"-f fasta -d aa -p {output.partition} -t {output.fasta} "
-		"-u fasta -y raxml -c 2"
+		"""
+		mkdir -p phylogeny/ logs/amas
+
+		AMAS.py concat -i {input.alns} \
+		-f fasta -d aa -p {output.partition} -t {output.fasta} \
+		-u fasta -y raxml -c 2 > {log} 2>&1
+		"""
 
 rule iqtree:
 	input:
-		fasta="phylogeny/busco-concat.fasta",
-		partition="phylogeny/busco-concat.partition"
+		fasta="busco-concat.fasta",
+		partition="busco-concat.partition"
 	output:
 		"busco-concat.treefile"
 	threads: 8
 	log: "logs/iqtree.txt"
 	params:
-		outdir="phylogeny",
+		outdir="phylogeny/",
 		prefix="busco-concat"
 	shell:
 		"""
-		iqtree2 -s {input.fasta} -p {input.partition} -m MFP -msub nuclear -T {threads} --prefix {params.prefix} -alrt 10000
+		mkdir -p logs/iqtree
+		
+		iqtree2 -s {input.fasta} -p {input.partition} \
+		-m MFP -msub nuclear -T {threads} \
+		--prefix {params.prefix} -alrt 10000 > {log} 2>&1
 		"""
 
 rule move_iqtree_output:
 	input:
 		"busco-concat.treefile"
 	output:
+		fasta="phylogeny/busco-concat.fasta",
+		partition="phylogeny/busco-concat.partition",
 		treefile="phylogeny/busco-concat.treefile",
 		log="phylogeny/busco-concat.log",
 		iqtree="phylogeny/busco-concat.iqtree",
@@ -78,7 +89,8 @@ rule move_iqtree_output:
 		model="phylogeny/busco-concat.model.gz"
 	shell:
 		"""
-		mkdir -p phylogeny
+		mv busco-concat.fasta {output.fasta}
+		mv busco-concat.partition {output.partition}
 		mv busco-concat.treefile {output.treefile}
 		mv busco-concat.log {output.log}
 		mv busco-concat.iqtree {output.iqtree}
