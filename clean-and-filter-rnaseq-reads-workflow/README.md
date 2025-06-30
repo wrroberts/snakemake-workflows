@@ -16,8 +16,8 @@ The following steps are undertaken by the workflow:
 ### Installation
 Clone the repository:
 ```
-git clone [https](https://github.com/wrroberts/snakemake-workflows/edit/main/clean-and-filter-rnaseq-reads-workflow.git
-cd clean-and-filter-rnaseq-reads-workflow/
+git clone [https](https://github.com/wrroberts/snakemake-workflows
+cd snakemake-workflows/clean-and-filter-rnaseq-reads-workflow/
 ```
 Install the conda environment:
 ```
