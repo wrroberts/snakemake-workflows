@@ -22,7 +22,7 @@ cd snakemake-workflows/busco-phylogeny-workflow
 ```
 Install the conda environment
 ```
-create env create -f busco-phylogeny-workflow.yml
+conda env create -f busco-phylogeny-workflow.yml
 
 conda activate busco-phylogeny-workflow
 ```
