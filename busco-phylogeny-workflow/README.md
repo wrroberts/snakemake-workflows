@@ -17,8 +17,8 @@ The following steps are undertaken by the workflow:
 ### Installation
 Clone the repository:
 ```
-git clone https://github.com/wrroberts/snakemake-workflows/busco-phylogeny-workflow.git
-cd busco-phylogeny-workflow
+git clone https://github.com/wrroberts/snakemake-workflows
+cd snakemake-workflows/busco-phylogeny-workflow
 ```
 Install the conda environment
 ```
