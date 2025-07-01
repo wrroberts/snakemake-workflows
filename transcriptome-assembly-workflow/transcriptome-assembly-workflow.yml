@@ -15,7 +15,7 @@ dependencies:
   - python=3.12.3
   - salmon=1.10.3
   - samtools=1.21
-  - snakemake-minimal=9.6.2=pyhdfd78af_0
+  - snakemake=9.6.1
   - transdecoder=5.7.1
   - transrate=1.0.3
   - trimmomatic=0.39
