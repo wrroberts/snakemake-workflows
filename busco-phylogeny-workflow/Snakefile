@@ -1,18 +1,18 @@
 configfile:
 	"config.json"
 
-GENES = glob_wildcards(config['data'] + "/prot-seqs/{gene}.faa")
+GENES, = glob_wildcards(f"{config['data']}/prot-seqs/{{gene}}.faa")
+
 if not GENES:
 	raise ValueError(f"No matching files for pattern: {config['data']}/prot-seqs/{{gene}}.faa")
 
 rule all:
 	input:
-		"phylogeny/busco-concat.treefile",
-		expand("alignments/{gene}.muscle.faa", gene=GENES)
+		"phylogeny/busco-concat.treefile"
 
 rule align_sequences:
 	input:
-		config['data'] + "/prot-seqs/{gene}.faa"
+		lambda wildcards: f"{config['data']}/prot-seqs/{wildcards.gene}.faa"
 	output:
 		"alignments/{gene}.muscle.faa"
 	log: "logs/muscle/{gene}.muscle.txt"
